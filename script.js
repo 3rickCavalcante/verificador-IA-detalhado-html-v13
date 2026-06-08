@@ -1,63 +1,82 @@
-// script.js - Detector de IA com modelo funcional (RoBERTa OpenAI Detector)
+// script.js - Detector baseado em heurísticas estatísticas (sem modelos externos)
 
-import { pipeline } from 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.7.0';
+// ==================== FUNÇÕES DE ANÁLISE ESTATÍSTICA ====================
 
-let classifier = null;
-let modelLoadingPromise = null;
-
-// Função para carregar o modelo (agora com um modelo que realmente funciona)
-async function loadModel() {
-    if (classifier) return classifier;
-    if (modelLoadingPromise) return modelLoadingPromise;
-
-    const statusDiv = document.createElement('div');
-    statusDiv.id = 'modelLoadStatus';
-    statusDiv.style.cssText = 'position:fixed;bottom:10px;right:10px;background:#333;color:#fff;padding:8px 12px;border-radius:8px;font-size:12px;z-index:9999';
-    statusDiv.innerHTML = '🤖 Carregando modelo de detecção de IA... (pode levar alguns segundos na primeira vez)';
-    document.body.appendChild(statusDiv);
-
-    modelLoadingPromise = (async () => {
-        try {
-            // Usando um modelo de detecção de IA já no formato ONNX
-            classifier = await pipeline('text-classification', 'onnx-community/roberta-base-openai-detector-ONNX');
-            statusDiv.innerHTML = '✅ Modelo de detecção carregado com sucesso!';
-            setTimeout(() => statusDiv.remove(), 3000);
-            return classifier;
-        } catch (err) {
-            console.error('Erro ao carregar o modelo:', err);
-            statusDiv.innerHTML = '❌ Falha ao carregar o modelo. Recarregue a página.';
-            setTimeout(() => statusDiv.remove(), 5000);
-            throw err;
-        }
-    })();
-    return modelLoadingPromise;
+// Calcula a perplexidade simulada (quanto menor, mais previsível → IA)
+function calculatePerplexity(text) {
+    const words = text.toLowerCase().split(/\s+/);
+    if (words.length < 10) return 0.5;
+    
+    // 1. Diversidade lexical (quantas palavras diferentes)
+    const uniqueWords = new Set(words);
+    const lexicalRichness = uniqueWords.size / words.length; // 0-1, valores altos = humano
+    
+    // 2. Tamanho médio das palavras (IA tende a usar palavras mais curtas e comuns)
+    const avgWordLen = words.reduce((sum, w) => sum + w.length, 0) / words.length;
+    
+    // 3. Repetição de bigramas (IA repete mais padrões)
+    let bigrams = new Set();
+    let repeatedBigrams = 0;
+    for (let i = 0; i < words.length - 1; i++) {
+        const bigram = words[i] + ' ' + words[i+1];
+        if (bigrams.has(bigram)) repeatedBigrams++;
+        else bigrams.add(bigram);
+    }
+    const repetitionRate = repeatedBigrams / Math.max(1, words.length - 1);
+    
+    // 4. Desvio padrão do comprimento das palavras (IA tem menos variação)
+    const variance = words.reduce((sum, w) => sum + Math.pow(w.length - avgWordLen, 2), 0) / words.length;
+    const stdDev = Math.sqrt(variance);
+    
+    // Pontuação final de "humanidade" (0 a 1)
+    let humanScore = 0;
+    
+    // Lexical richness: >0.6 = humano, <0.4 = IA
+    humanScore += Math.min(1, Math.max(0, (lexicalRichness - 0.3) / 0.4)) * 0.35;
+    
+    // Avg word length: >5 = humano, <4 = IA
+    humanScore += Math.min(1, Math.max(0, (avgWordLen - 3.5) / 2)) * 0.25;
+    
+    // Repetition rate: baixo = humano (inverso)
+    humanScore += (1 - Math.min(1, repetitionRate * 2)) * 0.25;
+    
+    // Std dev: >2.5 = humano, <1.5 = IA
+    humanScore += Math.min(1, Math.max(0, (stdDev - 1.2) / 2)) * 0.15;
+    
+    // Normalizar e converter para probabilidade (0-1)
+    let perplexity = 1 - humanScore;
+    perplexity = Math.min(0.95, Math.max(0.05, perplexity));
+    return perplexity;
 }
 
-// Função de classificação simplificada e funcional
-async function classifyText(text) {
-    const model = await loadModel();
-    const cleanedText = text.trim();
-    if (cleanedText.length < 50) {
-        throw new Error('Texto muito curto para análise significativa (mínimo 50 caracteres).');
+// Classifica o texto e retorna probabilidades
+function classifyText(text) {
+    const cleaned = text.trim();
+    if (cleaned.length < 100) {
+        throw new Error('Texto muito curto para análise (mínimo 100 caracteres).');
     }
     
-    // O modelo retorna um resultado como [{ label: 'LABEL_0', score: 0.95 }]
-    // Mapeamento: LABEL_0 = Humano, LABEL_1 = IA
-    const result = await model(cleanedText);
-    const isAI = result[0].label === 'LABEL_1';
-    const confidence = result[0].score;
+    const perplexity = calculatePerplexity(cleaned);
+    // Mapeia perplexidade para probabilidade humana: 
+    // perplexidade baixa (0-0.3) → IA, alta (0.7-1) → humano
+    let humanProb;
+    if (perplexity < 0.3) humanProb = 10;
+    else if (perplexity < 0.5) humanProb = 30;
+    else if (perplexity < 0.7) humanProb = 60;
+    else humanProb = 85;
     
-    let humanProb = isAI ? (1 - confidence) * 100 : confidence * 100;
-    let aiProb = isAI ? confidence * 100 : (1 - confidence) * 100;
+    // Ajuste fino baseado no tamanho do texto
+    const words = cleaned.split(/\s+/);
+    if (words.length > 500 && humanProb < 50) humanProb += 10; // textos longos com IA são menos prováveis
     
-    // Ajuste para evitar extremos muito abruptos
-    humanProb = Math.min(99, Math.max(1, humanProb));
-    aiProb = 100 - humanProb;
+    humanProb = Math.min(95, Math.max(5, humanProb));
+    const aiProb = 100 - humanProb;
+    const confidence = Math.abs(50 - humanProb) / 50; // confiança baseada na distância do 50%
     
-    return { humanProb, aiProb, confidence };
+    return { humanProb, aiProb, confidence: Math.min(0.95, confidence) };
 }
 
-// ==================== DOM ELEMENTOS ====================
+// ==================== DOM ELEMENTOS (mesmo do código anterior) ====================
 const textInput = document.getElementById('textInput');
 const analyzeBtn = document.getElementById('analyzeBtn');
 const clearBtn = document.getElementById('clearBtn');
@@ -116,7 +135,7 @@ function showLoading() {
     loadingDiv.style.display = 'flex';
     resultsContainer.style.opacity = '0.5';
     progressFill.style.width = '0%';
-    progressText.textContent = 'Carregando modelo...';
+    progressText.textContent = 'Analisando texto...';
 }
 
 function updateProgress(percent, msg) {
@@ -189,14 +208,14 @@ function generateAdvancedMetrics(humanProb, aiProb, text) {
     const avgSentenceLen = sentences.length ? (wordCount / sentences.length).toFixed(1) : 0;
     const uniqueWords = new Set(words.map(w => w.toLowerCase())).size;
     const lexicalDiversity = (uniqueWords / wordCount * 100).toFixed(1);
-    const aiScore = aiProb;
-    const perplexitySim = (20 + aiScore * 0.8).toFixed(0);
+    const avgWordLen = (words.reduce((s, w) => s + w.length, 0) / wordCount).toFixed(1);
+    const repetitionRate = (1 - uniqueWords / wordCount) * 100;
     
     const metrics = [
         { label: 'Extensão do Texto', value: `${wordCount} palavras`, icon: 'fas fa-text-height', tooltip: 'Total de palavras' },
-        { label: 'Frases Médias', value: `${avgSentenceLen} palavras/frase`, icon: 'fas fa-paragraph', tooltip: 'Média de palavras por frase' },
-        { label: 'Diversidade Lexical', value: `${lexicalDiversity}%`, icon: 'fas fa-brain', tooltip: 'Riqueza de vocabulário' },
-        { label: 'Perplexidade Estimada', value: perplexitySim, icon: 'fas fa-chart-line', tooltip: 'Baixa perplexidade → padrão IA' }
+        { label: 'Tamanho Médio da Palavra', value: `${avgWordLen} caracteres`, icon: 'fas fa-font', tooltip: 'Média de caracteres por palavra' },
+        { label: 'Diversidade Lexical', value: `${lexicalDiversity}%`, icon: 'fas fa-brain', tooltip: 'Quanto maior, mais humano' },
+        { label: 'Taxa de Repetição', value: `${repetitionRate.toFixed(1)}%`, icon: 'fas fa-repeat', tooltip: 'Repetição de palavras (IA tende a repetir mais)' }
     ];
     
     advancedMetricsDiv.innerHTML = metrics.map(m => `
@@ -214,12 +233,13 @@ function generateAdvancedMetrics(humanProb, aiProb, text) {
 function generateDetailedAnalysis(humanProb, aiProb, text) {
     const words = text.split(/\s+/);
     const avgWordLen = (words.reduce((s, w) => s + w.length, 0) / words.length).toFixed(1);
+    const uniqueRatio = new Set(words.map(w => w.toLowerCase())).size / words.length;
     
     const items = [
-        { icon: 'fas fa-language', title: 'Estrutura Sintática', desc: avgWordLen > 5 ? 'Vocabulário diverso, típico de humano.' : 'Palavras curtas e repetitivas, comum em IA.' },
-        { icon: 'fas fa-chart-line', title: 'Previsibilidade', desc: aiProb > 70 ? 'Alta previsibilidade (perplexidade baixa).' : 'Padrões variados, mais humano.' },
-        { icon: 'fas fa-repeat', title: 'Repetição', desc: aiProb > 60 ? 'Estruturas repetitivas detectadas.' : 'Sem repetições excessivas.' },
-        { icon: 'fas fa-graduation-cap', title: 'Adequação ao Nível', desc: academicLevel.value === 'doctoral' && words.length < 1500 ? 'Texto aquém do esperado.' : 'Extensão adequada.' }
+        { icon: 'fas fa-language', title: 'Variedade de Vocabulário', desc: uniqueRatio > 0.6 ? 'Alta diversidade, típico de humano.' : (uniqueRatio < 0.4 ? 'Muito repetitivo, suspeito de IA.' : 'Diversidade moderada.') },
+        { icon: 'fas fa-chart-line', title: 'Comprimento de Palavras', desc: avgWordLen > 5 ? 'Palavras longas e variadas (mais humano).' : 'Palavras curtas e comuns (padrão IA).' },
+        { icon: 'fas fa-repeat', title: 'Estruturas Repetitivas', desc: humanProb < 40 ? 'Frases e construções repetitivas detectadas.' : 'Boa variação estrutural.' },
+        { icon: 'fas fa-graduation-cap', title: 'Adequação ao Nível', desc: academicLevel.value === 'doctoral' && words.length < 1500 ? 'Texto aquém do esperado para doutorado.' : 'Extensão adequada ao nível.' }
     ];
     
     analysisGrid.innerHTML = items.map(i => `
@@ -239,13 +259,13 @@ function generateDetailedAnalysis(humanProb, aiProb, text) {
 function generateRecommendations(humanProb) {
     let recs = [];
     if (humanProb < 40) {
-        recs = ['🔍 Realize entrevista oral.', '📚 Solicite versão anotada.', '⚖️ Use como indicativo, não prova.'];
+        recs = ['🔍 Realize uma entrevista oral sobre o conteúdo.', '📚 Solicite uma versão anotada com comentários pessoais.', '⚖️ Use esta análise como indicativo, não como prova definitiva.'];
     } else if (humanProb < 70) {
-        recs = ['📝 Peça explicação oral de partes específicas.', '🔎 Compare com trabalhos anteriores.', '📊 Use outras ferramentas.'];
+        recs = ['📝 Peça ao aluno que explique partes específicas do texto.', '🔎 Compare com trabalhos anteriores do mesmo estudante.', '📊 Utilize outras ferramentas complementares.'];
     } else {
-        recs = ['✅ Parece autoria humana.', '📖 Continue incentivando a escrita acadêmica.'];
+        recs = ['✅ Parece ser autoria humana. Considere elogiar a qualidade.', '📖 Recomende que continue desenvolvendo sua escrita acadêmica.'];
     }
-    recs.push('📌 Nenhum detector é 100% preciso. Use o contexto.');
+    recs.push('📌 Nenhum detector é 100% preciso. Use sempre o contexto.');
     recommendationsList.innerHTML = recs.map(r => `<div class="recommendation-item"><i class="fas fa-lightbulb"></i><span>${r}</span></div>`).join('');
 }
 
@@ -256,28 +276,31 @@ async function performAnalysis() {
         return;
     }
     if (text.length < 100) {
-        alert('Texto muito curto (mínimo 100 caracteres).');
+        alert('Texto muito curto para análise confiável (mínimo 100 caracteres).');
         return;
     }
     
     showLoading();
-    updateProgress(20, 'Pré-processando texto...');
+    updateProgress(10, 'Pré-processando texto...');
     
-    try {
-        updateProgress(50, 'Classificando com modelo de IA...');
-        const result = await classifyText(text);
-        updateProgress(80, 'Gerando métricas...');
-        displayResults(result.humanProb, result.aiProb, result.confidence, text);
-        updateProgress(100, 'Análise concluída!');
-        setTimeout(hideLoading, 500);
-    } catch (err) {
-        console.error(err);
-        hideLoading();
-        alert(`Erro na análise: ${err.message}`);
-    }
+    // Pequeno atraso para simular processamento (opcional)
+    setTimeout(() => {
+        try {
+            updateProgress(50, 'Analisando padrões linguísticos...');
+            const result = classifyText(text);
+            updateProgress(80, 'Gerando métricas e alertas...');
+            displayResults(result.humanProb, result.aiProb, result.confidence, text);
+            updateProgress(100, 'Análise concluída!');
+            setTimeout(hideLoading, 500);
+        } catch (err) {
+            console.error(err);
+            hideLoading();
+            alert(`Erro na análise: ${err.message}`);
+        }
+    }, 100);
 }
 
-// Eventos e inicialização
+// ==================== EVENTOS E INICIALIZAÇÃO ====================
 function init() {
     updateCharCount();
     updateContextIndicator();
@@ -290,6 +313,7 @@ function init() {
     clearBtn.addEventListener('click', () => { 
         textInput.value = ''; 
         updateCharCount(); 
+        // Recarrega a página para limpar resultados (opcional)
         window.location.reload(); 
     });
     helpBtn.addEventListener('click', () => helpModal.style.display = 'flex');
@@ -302,7 +326,7 @@ function init() {
     });
     analysisContent.style.display = 'block';
     
-    // Upload de arquivos
+    // Upload de arquivos (mesmo código anterior)
     const uploadArea = document.getElementById('uploadArea');
     const fileInput = document.getElementById('fileInput');
     uploadArea.addEventListener('click', () => fileInput.click());
@@ -336,13 +360,14 @@ function init() {
             const result = await mammoth.extractRawText({ arrayBuffer });
             content = result.value;
         } else {
-            alert('Formato não suportado');
+            alert('Formato não suportado. Use PDF, DOCX ou TXT.');
             return;
         }
         textInput.value = content;
         updateCharCount();
     }
     
+    // Gerar relatório PDF
     generateReportBtn.addEventListener('click', () => {
         if (!currentAnalysisResult) {
             alert('Nenhuma análise realizada.');
@@ -357,7 +382,7 @@ function init() {
         doc.text(`Probabilidade Humana: ${Math.round(currentAnalysisResult.humanProb)}%`, 20, 40);
         doc.text(`Probabilidade IA: ${Math.round(currentAnalysisResult.aiProb)}%`, 20, 50);
         doc.text(`Confiança: ${Math.round(currentAnalysisResult.confidence * 100)}%`, 20, 60);
-        doc.text('Prévia do texto:', 20, 70);
+        doc.text('Prévia do texto analisado:', 20, 70);
         const preview = currentAnalysisResult.textAnalyzed.substring(0, 400);
         doc.text(preview, 20, 80, { maxWidth: 170 });
         doc.save(`relatorio_ia_${Date.now()}.pdf`);
@@ -365,7 +390,7 @@ function init() {
     
     exportDataBtn.addEventListener('click', () => {
         if (!currentAnalysisResult) {
-            alert('Nenhuma análise.');
+            alert('Nenhuma análise para exportar.');
             return;
         }
         const data = { ...currentAnalysisResult, textPreview: currentAnalysisResult.textAnalyzed.substring(0, 1000) };
@@ -388,9 +413,6 @@ function init() {
         localStorage.setItem('ia_detector_history', JSON.stringify(history));
         alert('Análise salva no histórico local.');
     });
-    
-    // Pré-carregar o modelo em segundo plano
-    loadModel().catch(console.warn);
 }
 
 window.addEventListener('DOMContentLoaded', init);
