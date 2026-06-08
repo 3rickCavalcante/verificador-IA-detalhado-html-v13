@@ -472,7 +472,7 @@ textarea:focus {
 
 /* ===== RESULTADOS ===== */
 .results-container {
-    display: none;
+    display: block; /* ALTERADO: antes era "none" */
 }
 
 /* ALERTAS ACADÊMICOS */
@@ -807,6 +807,23 @@ textarea:focus {
     box-shadow: var(--box-shadow-sm);
 }
 
+/* NOVOS ESTILOS PARA ÍCONES E INFO DAS MÉTRICAS */
+.metric-icon {
+    font-size: 2em;
+    margin-bottom: 10px;
+    color: var(--accent-color);
+}
+
+.metric-info {
+    text-align: center;
+}
+
+.metric-tooltip {
+    font-size: 0.75em;
+    color: var(--gray-color);
+    margin-top: 5px;
+}
+
 .metric-good {
     border-color: var(--success-color);
 }
@@ -1020,7 +1037,7 @@ textarea:focus {
     100% { opacity: 1; }
 }
 
-/* ANÁLISE DETALHADA */
+/* ANÁLISE DETALHADA (SUBSTITUÍDO COMPLETAMENTE) */
 .detailed-analysis {
     background: white;
     border-radius: var(--border-radius);
@@ -1080,22 +1097,35 @@ textarea:focus {
 }
 
 .analysis-item {
+    display: flex;
+    gap: 15px;
+    align-items: flex-start;
     background: var(--light-color);
     padding: 15px;
     border-radius: var(--border-radius-sm);
     border-left: 4px solid var(--accent-color);
 }
 
-.analysis-label {
-    font-size: 0.9em;
-    color: var(--gray-color);
-    margin-bottom: 8px;
+.analysis-icon {
+    font-size: 1.5em;
+    color: var(--accent-color);
+    margin-top: 3px;
 }
 
-.analysis-value {
-    font-size: 1.1em;
-    font-weight: 600;
+.analysis-text {
+    flex: 1;
+    line-height: 1.5;
+}
+
+.analysis-text strong {
     color: var(--primary-color);
+    display: block;
+    margin-bottom: 5px;
+}
+
+.analysis-text span {
+    color: var(--gray-color);
+    font-size: 0.9em;
 }
 
 .text-preview-container {
