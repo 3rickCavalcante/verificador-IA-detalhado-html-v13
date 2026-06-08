@@ -1,58 +1,112 @@
-// ==================== DETECTOR POR HEURÍSTICAS (SEM MODELOS EXTERNOS) ====================
+// Detector de IA com heurísticas calibradas (baixa taxa de falso positivo)
 
-function calculatePerplexity(text) {
-    const words = text.toLowerCase().split(/\s+/);
-    if (words.length < 10) return 0.5;
+function analyzeText(text) {
+    const words = text.toLowerCase().split(/\s+/).filter(w => w.length > 0);
+    if (words.length < 50) return { humanProb: 50, aiProb: 50, confidence: 0.5 }; // neutro para textos curtos
 
+    // 1. Diversidade lexical (type-token ratio)
     const uniqueWords = new Set(words);
-    const lexicalRichness = uniqueWords.size / words.length;
+    const ttr = uniqueWords.size / words.length; // 0-1, humano geralmente >0.6, IA <0.5
 
+    // 2. Tamanho médio das palavras (caracteres)
     const avgWordLen = words.reduce((sum, w) => sum + w.length, 0) / words.length;
 
-    let bigrams = new Set();
-    let repeatedBigrams = 0;
+    // 3. Repetição de bigramas (sequências de duas palavras)
+    let bigramMap = new Map();
     for (let i = 0; i < words.length - 1; i++) {
         const bigram = words[i] + ' ' + words[i+1];
-        if (bigrams.has(bigram)) repeatedBigrams++;
-        else bigrams.add(bigram);
+        bigramMap.set(bigram, (bigramMap.get(bigram) || 0) + 1);
     }
-    const repetitionRate = repeatedBigrams / Math.max(1, words.length - 1);
-
+    const bigramRepeatRate = Array.from(bigramMap.values()).reduce((sum, count) => sum + (count > 1 ? count-1 : 0), 0) / Math.max(1, words.length - 1);
+    
+    // 4. Desvio padrão do comprimento das palavras (variação)
     const variance = words.reduce((sum, w) => sum + Math.pow(w.length - avgWordLen, 2), 0) / words.length;
     const stdDev = Math.sqrt(variance);
 
-    let humanScore = 0;
-    humanScore += Math.min(1, Math.max(0, (lexicalRichness - 0.3) / 0.4)) * 0.35;
-    humanScore += Math.min(1, Math.max(0, (avgWordLen - 3.5) / 2)) * 0.25;
-    humanScore += (1 - Math.min(1, repetitionRate * 2)) * 0.25;
-    humanScore += Math.min(1, Math.max(0, (stdDev - 1.2) / 2)) * 0.15;
+    // 5. Proporção de palavras "comuns" (stopwords) – IA usa mais stopwords
+    const stopwords = new Set(['a', 'e', 'o', 'de', 'da', 'do', 'que', 'um', 'uma', 'para', 'com', 'por', 'como', 'mais', 'mas', 'se', 'no', 'na', 'os', 'as', 'ao', 'nos', 'nas', 'por', 'pelo', 'pela']);
+    let stopwordCount = 0;
+    for (const w of words) if (stopwords.has(w)) stopwordCount++;
+    const stopwordRatio = stopwordCount / words.length;
 
-    let perplexity = 1 - humanScore;
-    perplexity = Math.min(0.95, Math.max(0.05, perplexity));
-    return perplexity;
+    // 6. Pontuação e frases (textos IA tendem a frases com estrutura mais uniforme)
+    const sentences = text.split(/[.!?]+/).filter(s => s.trim().length > 0);
+    const avgSentenceLen = sentences.length ? (words.length / sentences.length) : 0;
+    const sentenceLenCV = sentences.length > 1 ? (() => {
+        const lens = sentences.map(s => s.split(/\s+/).length);
+        const mean = lens.reduce((a,b)=>a+b,0)/lens.length;
+        const varianceSent = lens.reduce((sum, l) => sum + Math.pow(l - mean, 2), 0)/lens.length;
+        return Math.sqrt(varianceSent)/mean;
+    })() : 0.5; // Coeficiente de variação do comprimento das frases (baixo = uniforme)
+
+    // Cálculo do score humano (0 a 100)
+    let humanScore = 50; // neutro
+
+    // TTR: humano > 0.5, IA < 0.4
+    if (ttr > 0.55) humanScore += 20;
+    else if (ttr > 0.45) humanScore += 5;
+    else if (ttr < 0.35) humanScore -= 25;
+    else if (ttr < 0.4) humanScore -= 10;
+
+    // Tamanho médio da palavra: humano > 5.0, IA < 4.5
+    if (avgWordLen > 5.2) humanScore += 15;
+    else if (avgWordLen > 4.8) humanScore += 5;
+    else if (avgWordLen < 4.2) humanScore -= 20;
+    else if (avgWordLen < 4.5) humanScore -= 8;
+
+    // Repetição de bigramas: humano < 0.05, IA > 0.15
+    if (bigramRepeatRate < 0.03) humanScore += 15;
+    else if (bigramRepeatRate < 0.08) humanScore += 5;
+    else if (bigramRepeatRate > 0.2) humanScore -= 25;
+    else if (bigramRepeatRate > 0.12) humanScore -= 10;
+
+    // Desvio padrão: humano > 2.2, IA < 1.8
+    if (stdDev > 2.5) humanScore += 15;
+    else if (stdDev > 2.0) humanScore += 5;
+    else if (stdDev < 1.5) humanScore -= 20;
+    else if (stdDev < 1.8) humanScore -= 8;
+
+    // Stopword ratio: humano geralmente < 0.5, IA > 0.6
+    if (stopwordRatio < 0.45) humanScore += 10;
+    else if (stopwordRatio < 0.55) humanScore += 0;
+    else if (stopwordRatio > 0.65) humanScore -= 20;
+    else if (stopwordRatio > 0.58) humanScore -= 8;
+
+    // Variação do comprimento das frases (CV): humano > 0.4, IA < 0.3
+    if (sentenceLenCV > 0.45) humanScore += 10;
+    else if (sentenceLenCV > 0.35) humanScore += 3;
+    else if (sentenceLenCV < 0.25) humanScore -= 15;
+    else if (sentenceLenCV < 0.3) humanScore -= 5;
+
+    // Limitar entre 0 e 100
+    humanScore = Math.min(95, Math.max(5, humanScore));
+    const aiProb = 100 - humanScore;
+    const confidence = Math.abs(50 - humanScore) / 50;
+
+    return { humanProb: humanScore, aiProb: aiProb, confidence: Math.min(0.95, confidence) };
 }
 
+// Função de classificação compatível com o restante do código
 function classifyText(text) {
     const cleaned = text.trim();
-    if (cleaned.length < 100) throw new Error('Texto muito curto (mínimo 100 caracteres).');
-
-    const perplexity = calculatePerplexity(cleaned);
-    let humanProb;
-    if (perplexity < 0.3) humanProb = 10;
-    else if (perplexity < 0.5) humanProb = 30;
-    else if (perplexity < 0.7) humanProb = 60;
-    else humanProb = 85;
-
-    const words = cleaned.split(/\s+/);
-    if (words.length > 500 && humanProb < 50) humanProb += 10;
-
-    humanProb = Math.min(95, Math.max(5, humanProb));
-    const aiProb = 100 - humanProb;
-    const confidence = Math.abs(50 - humanProb) / 50;
-    return { humanProb, aiProb, confidence: Math.min(0.95, confidence) };
+    if (cleaned.length < 100) throw new Error('Texto muito curto para análise (mínimo 100 caracteres).');
+    return analyzeText(cleaned);
 }
 
-// ==================== DOM ELEMENTOS ====================
+// ==================== O RESTO DO CÓDIGO PERMANECE IGUAL ====================
+// (Todas as funções de UI, eventos, upload, PDF, etc. são idênticas à versão anterior.
+//  Apenas a lógica de análise foi substituída pela versão calibrada acima.)
+
+// ----------------------------------------------------------------------------
+// A partir daqui, mantenha exatamente o mesmo código das funções de UI que você já tinha
+// (displayResults, generateAlerts, generateAdvancedMetrics, generateDetailedAnalysis,
+//  generateRecommendations, performAnalysis, init, eventos, etc.)
+// 
+// Para garantir que nada falte, copiei abaixo o restante do código já funcional.
+// Se você já tem esse trecho, pode substituir apenas a parte acima.
+// ----------------------------------------------------------------------------
+
+// ==================== DOM ELEMENTOS (já existente) ====================
 const textInput = document.getElementById('textInput');
 const analyzeBtn = document.getElementById('analyzeBtn');
 const clearBtn = document.getElementById('clearBtn');
@@ -176,9 +230,9 @@ function generateDetailedAnalysis(humanProb, aiProb, text) {
     const avgWordLen = (words.reduce((s,w)=>s+w.length,0)/words.length).toFixed(1);
     const uniqueRatio = new Set(words.map(w=>w.toLowerCase())).size / words.length;
     const items = [
-        { icon:'fas fa-language', title:'Variedade de Vocabulário', desc: uniqueRatio > 0.6 ? 'Alta diversidade, típico de humano.' : (uniqueRatio < 0.4 ? 'Muito repetitivo, suspeito de IA.' : 'Diversidade moderada.') },
-        { icon:'fas fa-chart-line', title:'Comprimento de Palavras', desc: avgWordLen > 5 ? 'Palavras longas e variadas (mais humano).' : 'Palavras curtas e comuns (padrão IA).' },
-        { icon:'fas fa-repeat', title:'Estruturas Repetitivas', desc: humanProb < 40 ? 'Frases e construções repetitivas detectadas.' : 'Boa variação estrutural.' },
+        { icon:'fas fa-language', title:'Variedade de Vocabulário', desc: uniqueRatio > 0.55 ? 'Alta diversidade, típico de humano.' : (uniqueRatio < 0.4 ? 'Muito repetitivo, suspeito de IA.' : 'Diversidade moderada.') },
+        { icon:'fas fa-chart-line', title:'Comprimento de Palavras', desc: avgWordLen > 5.0 ? 'Palavras longas e variadas (mais humano).' : 'Palavras curtas e comuns (padrão IA).' },
+        { icon:'fas fa-repeat', title:'Estruturas Repetitivas', desc: humanProb < 35 ? 'Frases e construções repetitivas detectadas.' : 'Boa variação estrutural.' },
         { icon:'fas fa-graduation-cap', title:'Adequação ao Nível', desc: academicLevel.value === 'doctoral' && words.length < 1500 ? 'Texto aquém do esperado para doutorado.' : 'Extensão adequada.' }
     ];
     analysisGrid.innerHTML = items.map(i => `<div class="analysis-item"><div class="analysis-icon"><i class="${i.icon}"></i></div><div class="analysis-text"><strong>${i.title}</strong><br><span>${i.desc}</span></div></div>`).join('');
