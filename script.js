@@ -1,1263 +1,476 @@
-/* ===== VARIÁVEIS E RESET ===== */
-:root {
-    --primary-color: #2c3e50;
-    --secondary-color: #34495e;
-    --accent-color: #3498db;
-    --success-color: #27ae60;
-    --warning-color: #f39c12;
-    --danger-color: #e74c3c;
-    --info-color: #17a2b8;
-    --light-color: #f8f9fa;
-    --dark-color: #343a40;
-    --gray-color: #6c757d;
-    --border-color: #dee2e6;
-    --shadow-color: rgba(0, 0, 0, 0.1);
-    
-    --border-radius: 12px;
-    --border-radius-sm: 8px;
-    --border-radius-lg: 16px;
-    
-    --box-shadow: 0 8px 25px var(--shadow-color);
-    --box-shadow-sm: 0 4px 12px var(--shadow-color);
-    --box-shadow-lg: 0 12px 35px var(--shadow-color);
-    
-    --transition: all 0.3s ease;
-    --font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+// ==================== BANCO DE EXEMPLOS ====================
+const STORAGE_KEY = 'ia_detector_exemplos';
+
+function loadExemplos() {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return [];
+    try {
+        return JSON.parse(raw);
+    } catch(e) { return []; }
 }
 
-* {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-    max-width: 100%;
+function saveExemplo(features, rotulo) {
+    const exemplos = loadExemplos();
+    exemplos.push({ features, rotulo, timestamp: Date.now() });
+    if (exemplos.length > 500) exemplos.shift();
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(exemplos));
 }
 
-html {
-    scroll-behavior: smooth;
-    overflow-x: hidden;
+function resetExemplos() {
+    localStorage.removeItem(STORAGE_KEY);
+    alert('Aprendizado resetado! Recarregue a página.');
+    window.location.reload();
 }
 
-body {
-    font-family: var(--font-family);
-    line-height: 1.6;
-    color: #333;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    min-height: 100vh;
-    padding: 20px;
-    overflow-x: hidden;
-    width: 100%;
-}
+// ==================== EXTRAÇÃO DE CARACTERÍSTICAS ====================
+function extractFeatures(text) {
+    const words = text.toLowerCase().split(/\s+/).filter(w => w.length > 0);
+    if (words.length === 0) return null;
 
-/* ===== CONTAINER PRINCIPAL ===== */
-.container {
-    max-width: 1400px;
-    margin: 0 auto;
-    background: white;
-    border-radius: var(--border-radius-lg);
-    box-shadow: var(--box-shadow-lg);
-    overflow: hidden;
-    min-height: 90vh;
-    width: 100%;
-}
+    // 1. Diversidade lexical (Type-Token Ratio)
+    const unique = new Set(words);
+    const ttr = unique.size / words.length;
 
-/* ===== CABEÇALHO ===== */
-header {
-    background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
-    color: white;
-    padding: 30px;
-    position: relative;
-    overflow: hidden;
-}
+    // 2. Tamanho médio das palavras
+    const avgWordLen = words.reduce((s, w) => s + w.length, 0) / words.length;
 
-header::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 4px;
-    background: linear-gradient(90deg, var(--accent-color), var(--success-color), var(--warning-color));
-}
-
-.header-content {
-    text-align: center;
-    max-width: 800px;
-    margin: 0 auto;
-}
-
-header h1 {
-    font-size: 2.3em;
-    font-weight: 700;
-    margin-bottom: 10px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 15px;
-    flex-wrap: wrap;
-}
-
-header h1 i {
-    color: var(--accent-color);
-    background: white;
-    padding: 12px;
-    border-radius: 50%;
-    font-size: 0.8em;
-}
-
-.subtitle {
-    font-size: 1.1em;
-    opacity: 0.9;
-    margin-bottom: 10px;
-}
-
-.warning-note {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    background: rgba(52, 152, 219, 0.1);
-    padding: 8px 16px;
-    border-radius: 50px;
-    font-size: 0.9em;
-    margin-top: 10px;
-}
-
-.warning-note i {
-    color: var(--accent-color);
-}
-
-/* ===== LAYOUT PRINCIPAL ===== */
-.main-content {
-    display: grid;
-    grid-template-columns: 1fr 1.2fr;
-    gap: 30px;
-    padding: 30px;
-    min-height: 600px;
-}
-
-@media (max-width: 1024px) {
-    .main-content {
-        grid-template-columns: 1fr;
-        gap: 20px;
-        padding: 20px;
+    // 3. Repetição de bigramas
+    let bigramCounts = new Map();
+    for (let i = 0; i < words.length - 1; i++) {
+        const bg = words[i] + ' ' + words[i+1];
+        bigramCounts.set(bg, (bigramCounts.get(bg) || 0) + 1);
     }
-}
-
-/* ===== SEÇÕES ===== */
-.section-header {
-    margin-bottom: 25px;
-}
-
-.section-header h2 {
-    color: var(--primary-color);
-    font-size: 1.5em;
-    font-weight: 600;
-    margin-bottom: 8px;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    flex-wrap: wrap;
-}
-
-.section-subtitle {
-    color: var(--gray-color);
-    font-size: 0.95em;
-}
-
-.upload-section, .results-section {
-    background: var(--light-color);
-    padding: 30px;
-    border-radius: var(--border-radius);
-    border: 1px solid var(--border-color);
-    height: fit-content;
-    overflow-x: auto;
-}
-
-/* ===== ÁREA DE UPLOAD ===== */
-.upload-area {
-    border: 3px dashed var(--accent-color);
-    border-radius: var(--border-radius);
-    padding: 40px 30px;
-    text-align: center;
-    background: linear-gradient(135deg, #f8f9ff, #eef2ff);
-    cursor: pointer;
-    transition: var(--transition);
-    margin-bottom: 30px;
-    position: relative;
-}
-
-.upload-area:hover {
-    background: linear-gradient(135deg, #eef2ff, #e0e7ff);
-    border-color: var(--primary-color);
-    transform: translateY(-3px);
-    box-shadow: var(--box-shadow-sm);
-}
-
-.upload-icon {
-    font-size: 3.5em;
-    color: var(--accent-color);
-    margin-bottom: 20px;
-}
-
-.upload-area h3 {
-    color: var(--primary-color);
-    margin-bottom: 10px;
-    font-size: 1.3em;
-}
-
-.upload-subtitle {
-    color: var(--gray-color);
-    margin-bottom: 15px;
-}
-
-.file-types {
-    display: flex;
-    justify-content: center;
-    gap: 10px;
-    margin-bottom: 15px;
-    flex-wrap: wrap;
-}
-
-.file-type-badge {
-    background: var(--accent-color);
-    color: white;
-    padding: 6px 12px;
-    border-radius: 20px;
-    font-size: 0.85em;
-    font-weight: 500;
-}
-
-.upload-note {
-    color: var(--gray-color);
-    font-size: 0.9em;
-}
-
-.file-input {
-    display: none;
-}
-
-/* ===== INPUT DE TEXTO ===== */
-.text-input-section {
-    margin-bottom: 25px;
-}
-
-.text-input-section h3 {
-    color: var(--primary-color);
-    margin-bottom: 15px;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    font-size: 1.1em;
-    flex-wrap: wrap;
-}
-
-textarea {
-    width: 100%;
-    padding: 20px;
-    border: 2px solid var(--border-color);
-    border-radius: var(--border-radius-sm);
-    font-family: var(--font-family);
-    font-size: 1em;
-    resize: vertical;
-    min-height: 180px;
-    transition: var(--transition);
-    background: white;
-    line-height: 1.6;
-}
-
-textarea:focus {
-    outline: none;
-    border-color: var(--accent-color);
-    box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
-}
-
-.char-counter {
-    text-align: right;
-    margin-top: 10px;
-    color: var(--gray-color);
-    font-size: 0.9em;
-}
-
-/* ===== CONTEXTO ACADÊMICO ===== */
-.academic-context-section {
-    background: white;
-    padding: 25px;
-    border-radius: var(--border-radius-sm);
-    border: 2px solid var(--border-color);
-    margin-bottom: 30px;
-}
-
-.academic-context-section h3 {
-    color: var(--primary-color);
-    margin-bottom: 10px;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    font-size: 1.2em;
-    flex-wrap: wrap;
-}
-
-.context-description {
-    color: var(--gray-color);
-    font-size: 0.95em;
-    margin-bottom: 20px;
-}
-
-.context-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 20px;
-    margin-bottom: 20px;
-}
-
-.context-field {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-}
-
-.context-field label {
-    color: var(--primary-color);
-    font-weight: 500;
-    font-size: 0.95em;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    flex-wrap: wrap;
-}
-
-.context-select, .length-input {
-    padding: 12px 15px;
-    border: 2px solid var(--border-color);
-    border-radius: var(--border-radius-sm);
-    font-family: var(--font-family);
-    font-size: 1em;
-    background: white;
-    transition: var(--transition);
-    width: 100%;
-}
-
-.context-select:focus, .length-input:focus {
-    outline: none;
-    border-color: var(--accent-color);
-}
-
-.length-input {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
-
-.length-input input {
-    flex: 1;
-    border: none;
-    outline: none;
-    font-family: inherit;
-    font-size: inherit;
-    min-width: 0;
-}
-
-.length-unit {
-    color: var(--gray-color);
-    font-size: 0.9em;
-}
-
-.context-indicator {
-    background: linear-gradient(135deg, #e3f2fd, #bbdefb);
-    color: #1565c0;
-    padding: 12px 20px;
-    border-radius: var(--border-radius-sm);
-    font-size: 0.95em;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    font-weight: 500;
-    flex-wrap: wrap;
-    word-break: break-word;
-}
-
-/* ===== BOTÕES ===== */
-.button-group {
-    display: flex;
-    gap: 15px;
-    margin-top: 20px;
-    flex-wrap: wrap;
-}
-
-.btn {
-    padding: 15px 25px;
-    border: none;
-    border-radius: 50px;
-    font-size: 1em;
-    font-weight: 600;
-    cursor: pointer;
-    transition: var(--transition);
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 10px;
-    flex: 1;
-    text-align: center;
-    min-width: 120px;
-}
-
-.btn-analyze {
-    background: linear-gradient(135deg, var(--accent-color), #2980b9);
-    color: white;
-}
-
-.btn-analyze:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 10px 20px rgba(52, 152, 219, 0.3);
-}
-
-.btn-clear {
-    background: linear-gradient(135deg, var(--gray-color), #495057);
-    color: white;
-}
-
-.btn-clear:hover {
-    background: linear-gradient(135deg, #5a6268, #343a40);
-    transform: translateY(-3px);
-}
-
-.btn-help {
-    background: white;
-    color: var(--primary-color);
-    border: 2px solid var(--border-color);
-}
-
-.btn-help:hover {
-    background: var(--light-color);
-    border-color: var(--accent-color);
-}
-
-/* ===== LOADING ===== */
-.loading {
-    display: none;
-    text-align: center;
-    padding: 50px 20px;
-    background: white;
-    border-radius: var(--border-radius);
-    margin: 20px 0;
-}
-
-.spinner-container {
-    max-width: 400px;
-    margin: 0 auto;
-}
-
-.spinner {
-    border: 4px solid #f3f3f3;
-    border-top: 4px solid var(--accent-color);
-    border-radius: 50%;
-    width: 60px;
-    height: 60px;
-    animation: spin 1s linear infinite;
-    margin: 0 auto 25px;
-}
-
-@keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
-}
-
-.spinner-text {
-    color: var(--primary-color);
-    font-size: 1.2em;
-    font-weight: 600;
-    margin-bottom: 15px;
-}
-
-.spinner-subtext {
-    color: var(--gray-color);
-}
-
-.progress-bar {
-    width: 100%;
-    height: 8px;
-    background: var(--border-color);
-    border-radius: 4px;
-    overflow: hidden;
-    margin-bottom: 10px;
-}
-
-.progress-fill {
-    height: 100%;
-    background: linear-gradient(90deg, var(--accent-color), var(--success-color));
-    width: 0%;
-    transition: width 0.3s ease;
-}
-
-/* ===== RESULTADOS ===== */
-.results-container {
-    display: block;
-    word-wrap: break-word;
-    overflow-wrap: break-word;
-    max-width: 100%;
-}
-
-/* ALERTAS ACADÊMICOS */
-.academic-alerts {
-    background: white;
-    border-radius: var(--border-radius);
-    padding: 25px;
-    margin-bottom: 25px;
-    border-left: 5px solid var(--warning-color);
-}
-
-.academic-alerts h3 {
-    color: var(--primary-color);
-    margin-bottom: 20px;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    flex-wrap: wrap;
-}
-
-.alerts-list {
-    display: flex;
-    flex-direction: column;
-    gap: 15px;
-}
-
-.alert-item {
-    display: flex;
-    align-items: flex-start;
-    gap: 15px;
-    padding: 15px;
-    border-radius: var(--border-radius-sm);
-    border-left: 4px solid;
-    word-break: break-word;
-}
-
-.alert-item span {
-    flex: 1;
-    word-break: break-word;
-}
-
-.alert-success { background: rgba(39, 174, 96, 0.1); border-left-color: var(--success-color); }
-.alert-warning { background: rgba(243, 156, 18, 0.1); border-left-color: var(--warning-color); }
-.alert-danger { background: rgba(231, 76, 60, 0.1); border-left-color: var(--danger-color); }
-.alert-info { background: rgba(23, 162, 184, 0.1); border-left-color: var(--info-color); }
-
-.alert-item i {
-    font-size: 1.2em;
-    margin-top: 2px;
-    flex-shrink: 0;
-}
-
-/* PROBABILIDADE */
-.probability-display {
-    background: white;
-    padding: 30px;
-    border-radius: var(--border-radius);
-    margin-bottom: 25px;
-    box-shadow: var(--box-shadow-sm);
-    overflow-x: auto;
-}
-
-.probability-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 25px;
-    flex-wrap: wrap;
-    gap: 10px;
-}
-
-.probability-header h3 {
-    color: var(--primary-color);
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    flex-wrap: wrap;
-}
-
-.confidence-badge {
-    background: linear-gradient(135deg, var(--info-color), #138496);
-    color: white;
-    padding: 8px 16px;
-    border-radius: 20px;
-    font-size: 0.9em;
-    font-weight: 600;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
-
-.probability-visual {
-    margin-bottom: 30px;
-    width: 100%;
-    overflow-x: auto;
-}
-
-.probability-bar {
-    min-width: 250px;
-    height: 40px;
-    background: #e9ecef;
-    border-radius: 20px;
-    overflow: hidden;
-    margin: 25px 0;
-    position: relative;
-    border: 2px solid #dee2e6;
-}
-
-.probability-fill {
-    height: 100%;
-    border-radius: 20px;
-    transition: width 0.8s cubic-bezier(0.34, 1.56, 0.64, 1);
-    position: relative;
-    width: 50%;
-}
-
-.human-fill {
-    background: linear-gradient(90deg, var(--success-color), #2ecc71);
-}
-
-.probability-marker {
-    position: absolute;
-    top: 0;
-    left: 50%;
-    transform: translateX(-50%);
-    height: 100%;
-    width: 2px;
-    background: transparent;
-    pointer-events: none;
-}
-
-.marker-line {
-    position: absolute;
-    top: 0;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 2px;
-    height: 100%;
-    background: var(--primary-color);
-    opacity: 0.3;
-}
-
-.marker-label {
-    position: absolute;
-    top: -30px;
-    left: 50%;
-    transform: translateX(-50%);
-    background: var(--primary-color);
-    color: white;
-    padding: 4px 12px;
-    border-radius: 12px;
-    font-size: 0.9em;
-    font-weight: 600;
-    white-space: nowrap;
-}
-
-.probability-labels {
-    display: flex;
-    justify-content: space-between;
-    margin-top: 15px;
-    font-weight: 600;
-    flex-wrap: wrap;
-    gap: 10px;
-}
-
-.label-left, .label-right {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 8px 16px;
-    border-radius: 20px;
-    font-size: 0.95em;
-}
-
-.label-left {
-    background: rgba(39, 174, 96, 0.1);
-    color: var(--success-color);
-}
-
-.label-right {
-    background: rgba(231, 76, 60, 0.1);
-    color: var(--danger-color);
-}
-
-.probability-details {
-    display: grid;
-    grid-template-columns: 2fr 1fr;
-    gap: 30px;
-}
-
-@media (max-width: 768px) {
-    .probability-details {
-        grid-template-columns: 1fr;
-        gap: 20px;
+    let repeated = 0;
+    for (let c of bigramCounts.values()) if (c > 1) repeated += (c - 1);
+    const bigramRepeat = repeated / Math.max(1, words.length - 1);
+
+    // 4. Desvio padrão do comprimento das palavras
+    const variance = words.reduce((s, w) => s + Math.pow(w.length - avgWordLen, 2), 0) / words.length;
+    const stdDev = Math.sqrt(variance);
+
+    // 5. Proporção de stopwords (lista reduzida)
+    const stopwords = new Set(['a','e','o','de','da','do','que','um','uma','para','com','por','como','mais','mas','se','no','na','os','as','ao','aos','pelo','pela']);
+    let stopCount = 0;
+    for (let w of words) if (stopwords.has(w)) stopCount++;
+    const stopRatio = stopCount / words.length;
+
+    // 6. Coeficiente de variação do comprimento das frases
+    const sentences = text.split(/[.!?]+/).filter(s => s.trim().length > 0);
+    let sentLenCV = 0.5;
+    if (sentences.length > 1) {
+        const lens = sentences.map(s => s.split(/\s+/).length);
+        const meanLen = lens.reduce((a,b)=>a+b,0)/lens.length;
+        const varLen = lens.reduce((s,l)=>s + Math.pow(l-meanLen,2),0)/lens.length;
+        sentLenCV = Math.sqrt(varLen) / meanLen;
     }
+
+    return { ttr, avgWordLen, bigramRepeat, stdDev, stopRatio, sentLenCV };
 }
 
-.verdict-box {
-    display: flex;
-    gap: 20px;
-    padding: 20px;
-    background: var(--light-color);
-    border-radius: var(--border-radius-sm);
-    border-left: 5px solid var(--accent-color);
-    flex-wrap: wrap;
+// ==================== CLASSIFICADOR K-NN ====================
+function distancia(a, b) {
+    let soma = 0;
+    for (let i = 0; i < a.length; i++) soma += Math.pow(a[i] - b[i], 2);
+    return Math.sqrt(soma);
 }
 
-.verdict-icon {
-    font-size: 2em;
-    color: var(--accent-color);
-}
+function classificarPorKNN(features, k = 5) {
+    const exemplos = loadExemplos();
+    if (exemplos.length < 3) return null;
 
-.verdict-content {
-    flex: 1;
-}
+    const vetor = [features.ttr, features.avgWordLen, features.bigramRepeat, features.stdDev, features.stopRatio, features.sentLenCV];
+    const vizinhos = exemplos.map(ex => ({
+        dist: distancia(vetor, ex.features),
+        rotulo: ex.rotulo
+    })).sort((a,b) => a.dist - b.dist).slice(0, k);
 
-.verdict-title {
-    font-size: 1.3em;
-    font-weight: 700;
-    margin-bottom: 8px;
-    color: var(--primary-color);
-}
-
-.verdict-description {
-    color: var(--gray-color);
-    font-size: 0.95em;
-    line-height: 1.5;
-}
-
-.probability-numbers {
-    display: flex;
-    flex-direction: column;
-    gap: 15px;
-}
-
-.prob-number {
-    text-align: center;
-    padding: 20px;
-    border-radius: var(--border-radius-sm);
-}
-
-.human-prob {
-    background: rgba(39, 174, 96, 0.1);
-    border: 2px solid var(--success-color);
-}
-
-.ai-prob {
-    background: rgba(231, 76, 60, 0.1);
-    border: 2px solid var(--danger-color);
-}
-
-.prob-label {
-    font-size: 0.9em;
-    color: var(--gray-color);
-    margin-bottom: 10px;
-    font-weight: 500;
-}
-
-.prob-value {
-    font-size: 2em;
-    font-weight: 700;
-    word-break: break-word;
-}
-
-.human-prob .prob-value { color: var(--success-color); }
-.ai-prob .prob-value { color: var(--danger-color); }
-
-/* MÉTRICAS AVANÇADAS */
-.advanced-metrics {
-    background: white;
-    border-radius: var(--border-radius);
-    padding: 30px;
-    margin-bottom: 25px;
-    box-shadow: var(--box-shadow-sm);
-}
-
-.advanced-metrics h3 {
-    color: var(--primary-color);
-    margin-bottom: 15px;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    flex-wrap: wrap;
-}
-
-.metrics-description {
-    color: var(--gray-color);
-    font-size: 0.95em;
-    margin-bottom: 25px;
-}
-
-.metric-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-    gap: 20px;
-}
-
-.metric-card {
-    background: var(--light-color);
-    padding: 20px;
-    border-radius: var(--border-radius-sm);
-    text-align: center;
-    transition: var(--transition);
-    border-top: 4px solid var(--accent-color);
-}
-
-.metric-icon {
-    font-size: 2em;
-    margin-bottom: 10px;
-    color: var(--accent-color);
-}
-
-.metric-info {
-    text-align: center;
-    word-break: break-word;
-}
-
-.metric-label {
-    font-size: 0.9em;
-    color: var(--gray-color);
-    margin-bottom: 5px;
-    font-weight: 500;
-}
-
-.metric-value {
-    font-size: 1.4em;
-    font-weight: 700;
-    color: var(--primary-color);
-    word-break: break-word;
-}
-
-.metric-tooltip {
-    font-size: 0.75em;
-    color: var(--gray-color);
-    margin-top: 5px;
-}
-
-/* ANÁLISE DETALHADA */
-.detailed-analysis {
-    background: white;
-    border-radius: var(--border-radius);
-    padding: 30px;
-    margin-bottom: 25px;
-    box-shadow: var(--box-shadow-sm);
-}
-
-.analysis-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 20px;
-    flex-wrap: wrap;
-    gap: 10px;
-}
-
-.analysis-header h3 {
-    color: var(--primary-color);
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    flex-wrap: wrap;
-}
-
-.btn-analysis-toggle {
-    background: none;
-    border: 2px solid var(--border-color);
-    color: var(--primary-color);
-    padding: 10px 20px;
-    border-radius: 20px;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-weight: 500;
-    transition: var(--transition);
-}
-
-.analysis-content {
-    margin-top: 20px;
-}
-
-.analysis-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-    gap: 15px;
-    margin-bottom: 30px;
-}
-
-.analysis-item {
-    display: flex;
-    gap: 15px;
-    align-items: flex-start;
-    background: var(--light-color);
-    padding: 15px;
-    border-radius: var(--border-radius-sm);
-    border-left: 4px solid var(--accent-color);
-}
-
-.analysis-icon {
-    font-size: 1.5em;
-    color: var(--accent-color);
-    flex-shrink: 0;
-}
-
-.analysis-text {
-    flex: 1;
-    line-height: 1.5;
-    word-break: break-word;
-}
-
-.analysis-text strong {
-    color: var(--primary-color);
-    display: block;
-    margin-bottom: 5px;
-}
-
-.analysis-text span {
-    color: var(--gray-color);
-    font-size: 0.9em;
-}
-
-.text-preview-container {
-    margin-top: 30px;
-}
-
-.text-preview-container h4 {
-    color: var(--primary-color);
-    margin-bottom: 15px;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    font-size: 1.1em;
-    flex-wrap: wrap;
-}
-
-.text-preview {
-    max-height: 300px;
-    overflow-y: auto;
-    border: 2px solid var(--border-color);
-    padding: 20px;
-    border-radius: var(--border-radius-sm);
-    background: white;
-    line-height: 1.8;
-    font-size: 0.95em;
-    word-break: break-word;
-    white-space: pre-wrap;
-}
-
-.text-preview::-webkit-scrollbar {
-    width: 8px;
-}
-
-.text-preview::-webkit-scrollbar-track {
-    background: #f1f1f1;
-    border-radius: 10px;
-}
-
-.text-preview::-webkit-scrollbar-thumb {
-    background: var(--accent-color);
-    border-radius: 10px;
-}
-
-.placeholder-text {
-    text-align: center;
-    padding: 40px 20px;
-    color: var(--gray-color);
-}
-
-.placeholder-text i {
-    font-size: 3em;
-    margin-bottom: 15px;
-    opacity: 0.5;
-}
-
-/* RECOMENDAÇÕES */
-.recommendations {
-    background: linear-gradient(135deg, #fff3cd, #ffeaa7);
-    border-radius: var(--border-radius);
-    padding: 25px;
-    margin-bottom: 25px;
-    border-left: 5px solid var(--warning-color);
-}
-
-.recommendations h3 {
-    color: #856404;
-    margin-bottom: 15px;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    flex-wrap: wrap;
-}
-
-.recommendations-list {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-}
-
-.recommendation-item {
-    display: flex;
-    align-items: flex-start;
-    gap: 12px;
-    color: #856404;
-    line-height: 1.5;
-    word-break: break-word;
-}
-
-.recommendation-item i {
-    margin-top: 3px;
-    flex-shrink: 0;
-}
-
-/* AÇÕES DE RELATÓRIO */
-.report-actions {
-    display: flex;
-    gap: 15px;
-    margin-top: 30px;
-    flex-wrap: wrap;
-}
-
-.btn-report, .btn-export, .btn-history {
-    padding: 12px 20px;
-    border: none;
-    border-radius: 50px;
-    font-size: 0.9em;
-    font-weight: 600;
-    cursor: pointer;
-    transition: var(--transition);
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    flex: 1;
-    min-width: 140px;
-}
-
-.btn-report {
-    background: linear-gradient(135deg, var(--danger-color), #c0392b);
-    color: white;
-}
-
-.btn-export {
-    background: white;
-    color: var(--primary-color);
-    border: 2px solid var(--border-color);
-}
-
-.btn-history {
-    background: linear-gradient(135deg, var(--success-color), #27ae60);
-    color: white;
-}
-
-.btn-report:hover, .btn-export:hover, .btn-history:hover {
-    transform: translateY(-3px);
-}
-
-/* RODAPÉ */
-footer {
-    background: var(--primary-color);
-    color: white;
-    padding: 25px 30px;
-    border-top: 4px solid var(--accent-color);
-}
-
-.footer-content {
-    display: grid;
-    grid-template-columns: auto 1fr auto;
-    gap: 30px;
-    align-items: center;
-}
-
-@media (max-width: 768px) {
-    .footer-content {
-        grid-template-columns: 1fr;
-        text-align: center;
-        gap: 20px;
+    const pesos = { humano: 0, ia: 0 };
+    for (let v of vizinhos) {
+        const peso = 1 / (v.dist + 0.001);
+        pesos[v.rotulo] += peso;
     }
+    const total = pesos.humano + pesos.ia;
+    if (total === 0) return null;
+    const probHumano = (pesos.humano / total) * 100;
+    const confianca = Math.abs(probHumano - 50) / 50;
+    return {
+        humano: probHumano,
+        ia: 100 - probHumano,
+        confianca: Math.min(0.95, confianca)
+    };
 }
 
-.footer-logo {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    font-size: 1.2em;
-    font-weight: 600;
+// ==================== HEURÍSTICA DE FALLBACK (CALIBRADA) ====================
+function heuristicaFallback(features) {
+    let score = 50;
+    // TTR (diversidade lexical) – humano geralmente > 0.55
+    if (features.ttr > 0.55) score += 20;
+    else if (features.ttr > 0.45) score += 5;
+    else if (features.ttr < 0.35) score -= 25;
+    else if (features.ttr < 0.4) score -= 10;
+    // Tamanho médio da palavra – humano geralmente > 5.0
+    if (features.avgWordLen > 5.2) score += 15;
+    else if (features.avgWordLen > 4.8) score += 5;
+    else if (features.avgWordLen < 4.2) score -= 20;
+    else if (features.avgWordLen < 4.5) score -= 8;
+    // Repetição de bigramas – humano raramente repete padrões
+    if (features.bigramRepeat < 0.03) score += 15;
+    else if (features.bigramRepeat < 0.08) score += 5;
+    else if (features.bigramRepeat > 0.2) score -= 25;
+    else if (features.bigramRepeat > 0.12) score -= 10;
+    // Desvio padrão – humano tem mais variação
+    if (features.stdDev > 2.5) score += 15;
+    else if (features.stdDev > 2.0) score += 5;
+    else if (features.stdDev < 1.5) score -= 20;
+    else if (features.stdDev < 1.8) score -= 8;
+    // Stopwords – humano usa menos palavras muito comuns
+    if (features.stopRatio < 0.45) score += 10;
+    else if (features.stopRatio > 0.65) score -= 20;
+    else if (features.stopRatio > 0.58) score -= 8;
+    // Variação do comprimento das frases – humano tem frases mais irregulares
+    if (features.sentLenCV > 0.45) score += 10;
+    else if (features.sentLenCV < 0.25) score -= 15;
+    else if (features.sentLenCV < 0.3) score -= 5;
+
+    return Math.min(95, Math.max(5, score));
 }
 
-.footer-logo i {
-    font-size: 1.5em;
-    color: var(--accent-color);
+// ==================== CLASSIFICAÇÃO PRINCIPAL ====================
+function classifyText(text) {
+    const cleaned = text.trim();
+    if (cleaned.length < 100) {
+        throw new Error('Texto muito curto para análise (mínimo 100 caracteres).');
+    }
+
+    const features = extractFeatures(cleaned);
+    if (!features) {
+        throw new Error('Não foi possível extrair características do texto.');
+    }
+
+    let knnResult = null;
+    if (loadExemplos().length >= 3) {
+        knnResult = classificarPorKNN(features);
+    }
+
+    let humanProb, confidence;
+    if (knnResult) {
+        humanProb = knnResult.humano;
+        confidence = knnResult.confianca;
+    } else {
+        humanProb = heuristicaFallback(features);
+        confidence = Math.abs(humanProb - 50) / 50;
+    }
+
+    const aiProb = 100 - humanProb;
+    return {
+        humanProb: Math.min(99, Math.max(1, humanProb)),
+        aiProb: Math.min(99, Math.max(1, aiProb)),
+        confidence: Math.min(0.95, confidence),
+        features: features
+    };
 }
 
-.footer-info p {
-    margin-bottom: 8px;
-    opacity: 0.9;
+// ==================== DOM ELEMENTOS ====================
+const textInput = document.getElementById('textInput');
+const analyzeBtn = document.getElementById('analyzeBtn');
+const clearBtn = document.getElementById('clearBtn');
+const helpBtn = document.getElementById('helpBtn');
+const loadingDiv = document.getElementById('loading');
+const resultsContainer = document.getElementById('resultsContainer');
+const charCountSpan = document.getElementById('charCount');
+const academicLevel = document.getElementById('academicLevel');
+const subjectArea = document.getElementById('subjectArea');
+const expectedLength = document.getElementById('expectedLength');
+const contextIndicator = document.getElementById('contextIndicator');
+const humanProbabilityBar = document.getElementById('humanProbabilityBar');
+const humanProbabilityValue = document.getElementById('humanProbabilityValue');
+const aiProbabilityValue = document.getElementById('aiProbabilityValue');
+const confidenceBadgeSpan = document.querySelector('#confidenceBadge span');
+const verdictTitle = document.getElementById('verdictTitle');
+const verdictDescription = document.getElementById('verdictDescription');
+const alertsList = document.getElementById('alertsList');
+const advancedMetricsDiv = document.getElementById('advancedMetrics');
+const analysisGrid = document.getElementById('analysisGrid');
+const textPreview = document.getElementById('textPreview');
+const recommendationsList = document.getElementById('recommendationsList');
+const toggleAnalysisBtn = document.getElementById('toggleAnalysis');
+const analysisContent = document.getElementById('analysisContent');
+const generateReportBtn = document.getElementById('generateReportBtn');
+const exportDataBtn = document.getElementById('exportDataBtn');
+const saveAnalysisBtn = document.getElementById('saveAnalysisBtn');
+const helpModal = document.getElementById('helpModal');
+const closeHelpModal = document.getElementById('closeHelpModal');
+const progressFill = document.getElementById('progressFill');
+const progressText = document.getElementById('progressText');
+
+let currentAnalysis = null;
+
+function updateCharCount() { charCountSpan.textContent = textInput.value.length; }
+
+function updateContextIndicator() {
+    const levelText = { undergrad:'Graduação', masters:'Mestrado', doctoral:'Doutorado', researcher:'Pesquisador' }[academicLevel.value];
+    const areaText = { humanities:'Humanidades', social:'Ciências Sociais', natural:'Ciências Naturais', applied:'Ciências Aplicadas' }[subjectArea.value];
+    contextIndicator.innerHTML = `<i class="fas fa-info-circle"></i><span>Modo: ${levelText} em ${areaText} - Análise rigorosa ativada</span>`;
 }
 
-.footer-warning {
-    font-size: 0.9em;
-    opacity: 0.8;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    justify-content: center;
+function showLoading() {
+    loadingDiv.style.display = 'flex';
+    resultsContainer.style.opacity = '0.5';
+    progressFill.style.width = '0%';
+    progressText.textContent = 'Analisando texto...';
 }
 
-.footer-version {
-    font-size: 0.9em;
-    opacity: 0.7;
-    text-align: right;
+function updateProgress(percent, msg) {
+    progressFill.style.width = `${percent}%`;
+    progressText.textContent = msg;
 }
 
-/* MODAL */
-.modal {
-    display: none;
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(0, 0, 0, 0.5);
-    z-index: 10000;
-    align-items: center;
-    justify-content: center;
+function hideLoading() {
+    loadingDiv.style.display = 'none';
+    resultsContainer.style.opacity = '1';
 }
 
-.modal-content {
-    background: white;
-    border-radius: var(--border-radius);
-    max-width: 500px;
-    width: 90%;
-    max-height: 80vh;
-    overflow-y: auto;
-    box-shadow: var(--box-shadow-lg);
+function injectFeedbackButtons() {
+    const container = document.getElementById('verdictBox');
+    if (!container) return;
+    const oldDiv = document.getElementById('feedbackButtons');
+    if (oldDiv) oldDiv.remove();
+
+    const feedbackDiv = document.createElement('div');
+    feedbackDiv.id = 'feedbackButtons';
+    feedbackDiv.style.marginTop = '15px';
+    feedbackDiv.style.display = 'flex';
+    feedbackDiv.style.gap = '10px';
+    feedbackDiv.style.justifyContent = 'center';
+    feedbackDiv.style.flexWrap = 'wrap';
+    feedbackDiv.innerHTML = `
+        <button id="btnFeedbackHumano" style="background:#27ae60; color:white; border:none; padding:8px 16px; border-radius:20px; cursor:pointer;">✅ Correto (Humano)</button>
+        <button id="btnFeedbackIA" style="background:#e74c3c; color:white; border:none; padding:8px 16px; border-radius:20px; cursor:pointer;">❌ Errado (É IA)</button>
+        <button id="btnResetAprendizado" style="background:#f39c12; color:white; border:none; padding:8px 16px; border-radius:20px; cursor:pointer;">🔄 Resetar Aprendizado</button>
+        <span style="font-size:0.8rem; color:#666;">Ajude o sistema a aprender</span>
+    `;
+    container.appendChild(feedbackDiv);
+
+    document.getElementById('btnFeedbackHumano')?.addEventListener('click', () => {
+        if (currentAnalysis?.features) {
+            saveExemplo(currentAnalysis.features, 'humano');
+            alert('Obrigado! O detector aprendeu com este texto (classificado como HUMANO).');
+            feedbackDiv.style.opacity = '0.5';
+        }
+    });
+    document.getElementById('btnFeedbackIA')?.addEventListener('click', () => {
+        if (currentAnalysis?.features) {
+            saveExemplo(currentAnalysis.features, 'ia');
+            alert('Obrigado! O detector aprendeu com este texto (classificado como IA).');
+            feedbackDiv.style.opacity = '0.5';
+        }
+    });
+    document.getElementById('btnResetAprendizado')?.addEventListener('click', () => {
+        resetExemplos();
+    });
 }
 
-.modal-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 20px 25px;
-    border-bottom: 1px solid var(--border-color);
-    flex-wrap: wrap;
-}
-
-.modal-header h3 {
-    color: var(--primary-color);
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
-
-.modal-close {
-    background: none;
-    border: none;
-    font-size: 1.5em;
-    color: var(--gray-color);
-    cursor: pointer;
-    padding: 0;
-    width: 30px;
-    height: 30px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 50%;
-}
-
-.modal-close:hover {
-    background: var(--light-color);
-    color: var(--primary-color);
-}
-
-.modal-body {
-    padding: 25px;
-}
-
-.help-section {
-    margin-bottom: 25px;
-}
-
-.help-section h4 {
-    color: var(--primary-color);
-    margin-bottom: 10px;
-    font-size: 1.1em;
-}
-
-.help-section p, .help-section li {
-    color: var(--gray-color);
-    line-height: 1.6;
-    word-break: break-word;
-}
-
-.help-section ul {
-    padding-left: 20px;
-    margin-top: 10px;
-}
-
-.help-section li {
-    margin-bottom: 8px;
-}
-
-/* ===== RESPONSIVIDADE GERAL ===== */
-@media (max-width: 768px) {
-    body {
-        padding: 10px;
+function displayResults(humanProb, aiProb, confidence, textAnalyzed, features) {
+    humanProbabilityBar.style.width = `${humanProb}%`;
+    humanProbabilityValue.textContent = `${Math.round(humanProb)}%`;
+    aiProbabilityValue.textContent = `${Math.round(aiProb)}%`;
+    const marker = document.getElementById('probabilityMarker');
+    const markerLabel = document.getElementById('markerLabel');
+    let pos = Math.min(95, Math.max(5, humanProb));
+    marker.style.left = `${pos}%`;
+    markerLabel.textContent = `${Math.round(humanProb)}%`;
+    confidenceBadgeSpan.textContent = `CONFIANÇA: ${Math.round(confidence * 100)}%`;
+    
+    if (humanProb > 70) {
+        verdictTitle.textContent = 'PROVÁVEL AUTORIA HUMANA';
+        verdictDescription.textContent = 'O texto apresenta padrões consistentes com escrita acadêmica humana.';
+    } else if (humanProb > 40) {
+        verdictTitle.textContent = 'PROBABILIDADE MODERADA DE USO DE IA';
+        verdictDescription.textContent = 'Características mistas. Recomenda-se análise detalhada.';
+    } else {
+        verdictTitle.textContent = 'ALTA PROBABILIDADE DE USO DE IA';
+        verdictDescription.textContent = 'Padrões típicos de geração automática detectados.';
     }
     
-    .container {
-        border-radius: var(--border-radius);
-    }
-    
-    .main-content {
-        padding: 15px;
-    }
-    
-    .upload-section, .results-section {
-        padding: 15px;
-    }
-    
-    header h1 {
-        font-size: 1.5em;
-        flex-direction: column;
-        gap: 10px;
-    }
-    
-    .button-group, .report-actions {
-        flex-direction: column;
-    }
-    
-    .btn {
-        width: 100%;
-    }
-    
-    .analysis-item {
-        flex-direction: column;
-        text-align: center;
-    }
-    
-    .analysis-icon {
-        margin-bottom: 8px;
-    }
-    
-    .verdict-box {
-        flex-direction: column;
-        text-align: center;
-    }
-    
-    .metric-grid {
-        grid-template-columns: 1fr;
-    }
-    
-    .probability-labels {
-        flex-direction: column;
-        align-items: center;
-    }
+    generateAlerts(humanProb, aiProb, textAnalyzed);
+    generateAdvancedMetrics(humanProb, aiProb, textAnalyzed);
+    generateDetailedAnalysis(humanProb, aiProb, textAnalyzed);
+    generateRecommendations(humanProb);
+    injectFeedbackButtons();
 }
 
-/* ===== UTILITÁRIOS ADICIONAIS ===== */
-.flex-wrap {
-    flex-wrap: wrap;
+function generateAlerts(humanProb, aiProb, text) {
+    const wordCount = text.split(/\s+/).length;
+    const expected = parseInt(expectedLength.value);
+    const alerts = [];
+    if (Math.abs(wordCount - expected) > expected * 0.3) {
+        alerts.push({ icon:'fas fa-ruler', text:`Comprimento (${wordCount} palavras) diferente do esperado (${expected}).`, type:'warning' });
+    }
+    if (aiProb > 80) alerts.push({ icon:'fas fa-exclamation-triangle', text:'Probabilidade altíssima de IA. Verificação cruzada necessária.', type:'critical' });
+    else if (aiProb > 60) alerts.push({ icon:'fas fa-chart-line', text:'Fortes indícios de automação. Analisar consistência.', type:'warning' });
+    else if (humanProb > 80) alerts.push({ icon:'fas fa-check-circle', text:'Padrões humanos consistentes. Baixa chance de IA.', type:'success' });
+    alertsList.innerHTML = alerts.length ? alerts.map(a => `<div class="alert-item alert-${a.type}"><i class="${a.icon}"></i><span>${a.text}</span></div>`).join('') : '<div class="alert-item alert-info"><i class="fas fa-check-circle"></i><span>Nenhum alerta significativo.</span></div>';
 }
-.break-word {
-    word-break: break-word;
+
+function generateAdvancedMetrics(humanProb, aiProb, text) {
+    const words = text.split(/\s+/);
+    const unique = new Set(words.map(w => w.toLowerCase()));
+    const ttr = (unique.size / words.length) * 100;
+    const avgWordLen = (words.reduce((s,w) => s + w.length, 0) / words.length).toFixed(1);
+    const metrics = [
+        { label:'Extensão do Texto', value:`${words.length} palavras`, icon:'fas fa-text-height', tooltip:'Total de palavras' },
+        { label:'Diversidade Lexical', value:`${ttr.toFixed(1)}%`, icon:'fas fa-brain', tooltip:'Quanto maior, mais rico em vocabulário (típico de humano)' },
+        { label:'Tamanho Médio', value:`${avgWordLen} caracteres`, icon:'fas fa-font', tooltip:'Palavras mais longas são mais comuns em textos humanos' }
+    ];
+    advancedMetricsDiv.innerHTML = metrics.map(m => `
+        <div class="metric-card">
+            <div class="metric-icon"><i class="${m.icon}"></i></div>
+            <div class="metric-info">
+                <div class="metric-label">${m.label}</div>
+                <div class="metric-value">${m.value}</div>
+                <div class="metric-tooltip">${m.tooltip}</div>
+            </div>
+        </div>
+    `).join('');
 }
-.overflow-auto {
-    overflow: auto;
+
+function generateDetailedAnalysis(humanProb, aiProb, text) {
+    const words = text.split(/\s+/);
+    const avgLen = (words.reduce((s,w) => s + w.length, 0) / words.length).toFixed(1);
+    const uniqueRatio = new Set(words.map(w => w.toLowerCase())).size / words.length;
+    const analysisItems = [
+        { icon:'fas fa-language', title:'Variedade de Vocabulário', desc: uniqueRatio > 0.55 ? 'Alta diversidade, típico de humano.' : (uniqueRatio < 0.4 ? 'Muito repetitivo, suspeito de IA.' : 'Diversidade moderada.') },
+        { icon:'fas fa-chart-line', title:'Comprimento de Palavras', desc: avgLen > 5.0 ? 'Palavras longas e variadas (mais humano).' : 'Palavras curtas e comuns (padrão IA).' },
+        { icon:'fas fa-repeat', title:'Estruturas Repetitivas', desc: humanProb < 35 ? 'Frases e construções repetitivas detectadas.' : 'Boa variação estrutural.' }
+    ];
+    analysisGrid.innerHTML = analysisItems.map(i => `
+        <div class="analysis-item">
+            <div class="analysis-icon"><i class="${i.icon}"></i></div>
+            <div class="analysis-text"><strong>${i.title}</strong><br><span>${i.desc}</span></div>
+        </div>
+    `).join('');
+    const preview = text.length > 500 ? text.substring(0, 500) + '...' : text;
+    textPreview.innerHTML = `<p>${preview.replace(/\n/g, '<br>')}</p>`;
 }
+
+function generateRecommendations(humanProb) {
+    let recs = [];
+    if (humanProb < 40) {
+        recs = ['🔍 Realize uma entrevista oral sobre o conteúdo.', '📚 Solicite uma versão anotada com comentários pessoais.', '⚖️ Use esta análise como indicativo, não como prova definitiva.'];
+    } else if (humanProb < 70) {
+        recs = ['📝 Peça ao aluno que explique partes específicas do texto.', '🔎 Compare com trabalhos anteriores do mesmo estudante.', '📊 Utilize outras ferramentas complementares.'];
+    } else {
+        recs = ['✅ Parece ser autoria humana. Considere elogiar a qualidade.', '📖 Recomende que continue desenvolvendo sua escrita acadêmica.'];
+    }
+    recs.push('📌 Nenhum detector é 100% preciso. Use sempre o contexto.');
+    recommendationsList.innerHTML = recs.map(r => `<div class="recommendation-item"><i class="fas fa-lightbulb"></i><span>${r}</span></div>`).join('');
+}
+
+async function performAnalysis() {
+    let text = textInput.value.trim();
+    if (!text) { alert('Insira um texto ou faça upload.'); return; }
+    if (text.length < 100) { alert('Texto muito curto (mínimo 100 caracteres).'); return; }
+    showLoading();
+    updateProgress(10, 'Pré-processando...');
+    setTimeout(() => {
+        try {
+            updateProgress(50, 'Extraindo características...');
+            const result = classifyText(text);
+            updateProgress(80, 'Gerando resultados...');
+            displayResults(result.humanProb, result.aiProb, result.confidence, text, result.features);
+            currentAnalysis = { text, features: result.features, humanProb: result.humanProb };
+            updateProgress(100, 'Concluído!');
+            setTimeout(hideLoading, 500);
+        } catch (err) {
+            console.error(err);
+            hideLoading();
+            alert(`Erro: ${err.message}`);
+        }
+    }, 100);
+}
+
+// ==================== INICIALIZAÇÃO ====================
+function init() {
+    updateCharCount();
+    updateContextIndicator();
+    textInput.addEventListener('input', updateCharCount);
+    academicLevel.addEventListener('change', updateContextIndicator);
+    subjectArea.addEventListener('change', updateContextIndicator);
+    expectedLength.addEventListener('input', updateContextIndicator);
+    analyzeBtn.addEventListener('click', performAnalysis);
+    clearBtn.addEventListener('click', () => { textInput.value = ''; updateCharCount(); window.location.reload(); });
+    helpBtn.addEventListener('click', () => helpModal.style.display = 'flex');
+    closeHelpModal.addEventListener('click', () => helpModal.style.display = 'none');
+    window.addEventListener('click', (e) => { if (e.target === helpModal) helpModal.style.display = 'none'; });
+    toggleAnalysisBtn.addEventListener('click', () => {
+        const isVisible = analysisContent.style.display !== 'none';
+        analysisContent.style.display = isVisible ? 'none' : 'block';
+        toggleAnalysisBtn.innerHTML = isVisible ? '<i class="fas fa-chevron-down"></i> Expandir' : '<i class="fas fa-chevron-up"></i> Recolher';
+    });
+    analysisContent.style.display = 'block';
+
+    // Upload de arquivos
+    const uploadArea = document.getElementById('uploadArea');
+    const fileInput = document.getElementById('fileInput');
+    uploadArea.addEventListener('click', () => fileInput.click());
+    uploadArea.addEventListener('dragover', e => { e.preventDefault(); uploadArea.classList.add('drag-over'); });
+    uploadArea.addEventListener('dragleave', () => uploadArea.classList.remove('drag-over'));
+    uploadArea.addEventListener('drop', async e => {
+        e.preventDefault();
+        uploadArea.classList.remove('drag-over');
+        const file = e.dataTransfer.files[0];
+        if (file) await processFile(file);
+    });
+    fileInput.addEventListener('change', async e => { if (e.target.files.length) await processFile(e.target.files[0]); });
+
+    async function processFile(file) {
+        const ext = file.name.split('.').pop().toLowerCase();
+        let content = '';
+        if (ext === 'txt') content = await file.text();
+        else if (ext === 'pdf') {
+            const arrayBuffer = await file.arrayBuffer();
+            const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+            let full = '';
+            for (let i = 1; i <= pdf.numPages; i++) {
+                const page = await pdf.getPage(i);
+                const txt = await page.getTextContent();
+                full += txt.items.map(t => t.str).join(' ') + '\n';
+            }
+            content = full;
+        } else if (ext === 'docx') {
+            const arrayBuffer = await file.arrayBuffer();
+            const result = await mammoth.extractRawText({ arrayBuffer });
+            content = result.value;
+        } else { alert('Formato não suportado'); return; }
+        textInput.value = content;
+        updateCharCount();
+    }
+
+    // Relatórios
+    generateReportBtn.addEventListener('click', () => {
+        if (!currentAnalysis) { alert('Nenhuma análise.'); return; }
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF();
+        doc.setFontSize(16); doc.text('Relatório de Detecção de IA', 20, 20);
+        doc.setFontSize(12);
+        doc.text(`Data: ${new Date().toLocaleString()}`, 20, 30);
+        doc.text(`Probabilidade Humana: ${Math.round(currentAnalysis.humanProb)}%`, 20, 40);
+        doc.save(`relatorio_ia_${Date.now()}.pdf`);
+    });
+    exportDataBtn.addEventListener('click', () => {
+        if (!currentAnalysis) return;
+        const data = { ...currentAnalysis, textPreview: currentAnalysis.text.substring(0, 500) };
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a'); a.href = url; a.download = `analise_ia_${Date.now()}.json`; a.click(); URL.revokeObjectURL(url);
+    });
+    saveAnalysisBtn.addEventListener('click', () => {
+        if (!currentAnalysis) return;
+        const history = JSON.parse(localStorage.getItem('ia_detector_history') || '[]');
+        history.push(currentAnalysis);
+        localStorage.setItem('ia_detector_history', JSON.stringify(history));
+        alert('Análise salva no histórico.');
+    });
+}
+
+window.addEventListener('DOMContentLoaded', init);
