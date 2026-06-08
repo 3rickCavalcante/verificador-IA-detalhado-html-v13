@@ -4,19 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Detector Acadêmico de IA - Uso Educacional</title>
-    
-    <!-- CSS PRINCIPAL -->
     <link rel="stylesheet" href="style.css">
-    
-    <!-- BIBLIOTECAS EXTERNAS -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
-    
-    <!-- ÍCONES -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    
-    <!-- FONTS -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
@@ -30,7 +22,6 @@
         </header>
 
         <div class="main-content">
-            <!-- SEÇÃO DE UPLOAD -->
             <div class="upload-section">
                 <div class="section-header">
                     <h2><i class="fas fa-upload"></i> ENVIAR TRABALHO PARA ANÁLISE</h2>
@@ -38,9 +29,7 @@
                 </div>
                 
                 <div class="upload-area" id="uploadArea">
-                    <div class="upload-icon">
-                        <i class="fas fa-file-upload"></i>
-                    </div>
+                    <div class="upload-icon"><i class="fas fa-file-upload"></i></div>
                     <h3>Arraste e solte o arquivo aqui</h3>
                     <p class="upload-subtitle">ou clique para selecionar</p>
                     <div class="file-types">
@@ -55,17 +44,13 @@
 
                 <div class="text-input-section">
                     <h3><i class="fas fa-paste"></i> OU COLE O TEXTO AQUI</h3>
-                    <textarea id="textInput" placeholder="Cole o texto do trabalho acadêmico aqui para análise...&#10;&#10;Exemplo: 'Este artigo analisa a importância da musicalização no processo de alfabetização infantil, considerando os aspectos cognitivos e socioafetivos envolvidos.'" rows="8"></textarea>
-                    <div class="char-counter">
-                        <span id="charCount">0</span> caracteres
-                    </div>
+                    <textarea id="textInput" placeholder="Cole o texto do trabalho acadêmico aqui para análise..." rows="8"></textarea>
+                    <div class="char-counter"><span id="charCount">0</span> caracteres</div>
                 </div>
 
-                <!-- CONTEXTO ACADÊMICO -->
                 <div class="academic-context-section">
                     <h3><i class="fas fa-university"></i> CONTEXTO ACADÊMICO</h3>
                     <p class="context-description">Configure os parâmetros para análise contextualizada</p>
-                    
                     <div class="context-grid">
                         <div class="context-field">
                             <label for="academicLevel"><i class="fas fa-user-graduate"></i> Nível do Estudante</label>
@@ -76,7 +61,6 @@
                                 <option value="researcher">Pesquisador</option>
                             </select>
                         </div>
-                        
                         <div class="context-field">
                             <label for="subjectArea"><i class="fas fa-book"></i> Área do Conhecimento</label>
                             <select id="subjectArea" class="context-select">
@@ -86,232 +70,98 @@
                                 <option value="applied">Ciências Aplicadas</option>
                             </select>
                         </div>
-                        
                         <div class="context-field">
                             <label for="expectedLength"><i class="fas fa-ruler"></i> Comprimento Esperado</label>
-                            <div class="length-input">
-                                <input type="number" id="expectedLength" min="500" max="20000" value="3000">
-                                <span class="length-unit">palavras</span>
-                            </div>
+                            <div class="length-input"><input type="number" id="expectedLength" min="500" max="20000" value="3000"><span class="length-unit">palavras</span></div>
                         </div>
                     </div>
-                    
-                    <div class="context-indicator" id="contextIndicator">
-                        <i class="fas fa-info-circle"></i>
-                        <span>Modo: Mestrado em Ciências Sociais - Análise rigorosa ativada</span>
-                    </div>
+                    <div class="context-indicator" id="contextIndicator"><i class="fas fa-info-circle"></i><span>Modo: Mestrado em Ciências Sociais - Análise rigorosa ativada</span></div>
                 </div>
 
                 <div class="button-group">
-                    <button class="btn btn-analyze" id="analyzeBtn">
-                        <i class="fas fa-search"></i> ANALISAR TRABALHO
-                    </button>
-                    <button class="btn btn-clear" id="clearBtn">
-                        <i class="fas fa-broom"></i> LIMPAR TUDO
-                    </button>
-                    <button class="btn btn-help" id="helpBtn">
-                        <i class="fas fa-question-circle"></i> AJUDA
-                    </button>
+                    <button class="btn btn-analyze" id="analyzeBtn"><i class="fas fa-search"></i> ANALISAR TRABALHO</button>
+                    <button class="btn btn-clear" id="clearBtn"><i class="fas fa-broom"></i> LIMPAR TUDO</button>
+                    <button class="btn btn-help" id="helpBtn"><i class="fas fa-question-circle"></i> AJUDA</button>
                 </div>
             </div>
 
-            <!-- SEÇÃO DE RESULTADOS -->
             <div class="results-section">
                 <div class="section-header">
                     <h2><i class="fas fa-chart-bar"></i> RESULTADOS DA ANÁLISE</h2>
                     <p class="section-subtitle">Detecção especializada para contexto acadêmico</p>
                 </div>
                 
-                <!-- LOADING -->
                 <div class="loading" id="loading">
                     <div class="spinner-container">
                         <div class="spinner"></div>
                         <div class="spinner-text">Analisando trabalho acadêmico...</div>
                         <div class="spinner-subtext">
-                            <div class="progress-bar">
-                                <div class="progress-fill" id="progressFill"></div>
-                            </div>
+                            <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
                             <span id="progressText">Inicializando análise...</span>
                         </div>
                     </div>
                 </div>
 
-                <!-- CONTAINER DE RESULTADOS -->
                 <div class="results-container" id="resultsContainer">
-                    <!-- ALERTAS ACADÊMICOS -->
                     <div class="academic-alerts" id="academicAlerts">
                         <h3><i class="fas fa-bell"></i> ALERTAS ACADÊMICOS</h3>
-                        <div class="alerts-list" id="alertsList">
-                            <!-- Alertas serão inseridos aqui -->
-                        </div>
+                        <div class="alerts-list" id="alertsList"></div>
                     </div>
 
-                    <!-- PROBABILIDADE -->
                     <div class="probability-display">
                         <div class="probability-header">
                             <h3><i class="fas fa-chart-pie"></i> PROBABILIDADE DE AUTORIA</h3>
-                            <div class="confidence-badge" id="confidenceBadge">
-                                <i class="fas fa-shield-alt"></i>
-                                <span>CONFIANÇA: 0%</span>
-                            </div>
+                            <div class="confidence-badge" id="confidenceBadge"><i class="fas fa-shield-alt"></i><span>CONFIANÇA: 0%</span></div>
                         </div>
-                        
                         <div class="probability-visual">
                             <div class="probability-bar">
                                 <div class="probability-fill human-fill" id="humanProbabilityBar"></div>
-                                <div class="probability-marker" id="probabilityMarker">
-                                    <div class="marker-line"></div>
-                                    <div class="marker-label" id="markerLabel">50%</div>
-                                </div>
+                                <div class="probability-marker" id="probabilityMarker"><div class="marker-line"></div><div class="marker-label" id="markerLabel">50%</div></div>
                             </div>
-                            
                             <div class="probability-labels">
-                                <div class="label-left">
-                                    <i class="fas fa-user-graduate"></i>
-                                    <span>ESTUDANTE</span>
-                                </div>
-                                <div class="label-right">
-                                    <i class="fas fa-robot"></i>
-                                    <span>INTELIGÊNCIA ARTIFICIAL</span>
-                                </div>
+                                <div class="label-left"><i class="fas fa-user-graduate"></i><span>ESTUDANTE</span></div>
+                                <div class="label-right"><i class="fas fa-robot"></i><span>INTELIGÊNCIA ARTIFICIAL</span></div>
                             </div>
                         </div>
-                        
                         <div class="probability-details">
                             <div class="verdict-box" id="verdictBox">
-                                <div class="verdict-icon">
-                                    <i class="fas fa-balance-scale"></i>
-                                </div>
-                                <div class="verdict-content">
-                                    <div class="verdict-title" id="verdictTitle">ANÁLISE NÃO REALIZADA</div>
-                                    <div class="verdict-description" id="verdictDescription">Envie um trabalho para análise</div>
-                                </div>
+                                <div class="verdict-icon"><i class="fas fa-balance-scale"></i></div>
+                                <div class="verdict-content"><div class="verdict-title" id="verdictTitle">ANÁLISE NÃO REALIZADA</div><div class="verdict-description" id="verdictDescription">Envie um trabalho para análise</div></div>
                             </div>
-                            
                             <div class="probability-numbers">
-                                <div class="prob-number human-prob">
-                                    <div class="prob-label">AUTORIA HUMANA</div>
-                                    <div class="prob-value" id="humanProbabilityValue">0%</div>
-                                </div>
-                                <div class="prob-number ai-prob">
-                                    <div class="prob-label">USO DE IA</div>
-                                    <div class="prob-value" id="aiProbabilityValue">0%</div>
-                                </div>
+                                <div class="prob-number human-prob"><div class="prob-label">AUTORIA HUMANA</div><div class="prob-value" id="humanProbabilityValue">0%</div></div>
+                                <div class="prob-number ai-prob"><div class="prob-label">USO DE IA</div><div class="prob-value" id="aiProbabilityValue">0%</div></div>
                             </div>
                         </div>
                     </div>
 
-                    <!-- MÉTRICAS AVANÇADAS -->
                     <div class="advanced-metrics">
                         <h3><i class="fas fa-tachometer-alt"></i> MÉTRICAS ACADÊMICAS AVANÇADAS</h3>
-                        <div class="metrics-description">
-                            Análise contextualizada considerando nível acadêmico e padrões específicos
-                        </div>
-                        
-                        <div class="metric-grid" id="advancedMetrics">
-                            <!-- Métricas serão inseridas aqui -->
-                        </div>
+                        <div class="metrics-description">Análise contextualizada considerando nível acadêmico e padrões específicos</div>
+                        <div class="metric-grid" id="advancedMetrics"></div>
                     </div>
 
-                    <!-- ANÁLISE DETALHADA -->
                     <div class="detailed-analysis">
-                        <div class="analysis-header">
-                            <h3><i class="fas fa-microscope"></i> ANÁLISE DETALHADA DO TRABALHO</h3>
-                            <button class="btn-analysis-toggle" id="toggleAnalysis">
-                                <i class="fas fa-chevron-down"></i> Expandir
-                            </button>
-                        </div>
-                        
-                        <div class="analysis-content" id="analysisContent">
-                            <div class="analysis-grid" id="analysisGrid">
-                                <!-- Análise detalhada será inserida aqui -->
-                            </div>
-                            
-                            <div class="text-preview-container">
-                                <h4><i class="fas fa-file-alt"></i> PRÉVIA DO TEXTO ANALISADO</h4>
-                                <div class="text-preview" id="textPreview">
-                                    <div class="placeholder-text">
-                                        <i class="fas fa-file"></i>
-                                        <p>Nenhum texto para exibir. Faça uma análise primeiro.</p>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
+                        <div class="analysis-header"><h3><i class="fas fa-microscope"></i> ANÁLISE DETALHADA DO TRABALHO</h3><button class="btn-analysis-toggle" id="toggleAnalysis"><i class="fas fa-chevron-down"></i> Expandir</button></div>
+                        <div class="analysis-content" id="analysisContent"><div class="analysis-grid" id="analysisGrid"></div><div class="text-preview-container"><h4><i class="fas fa-file-alt"></i> PRÉVIA DO TEXTO ANALISADO</h4><div class="text-preview" id="textPreview"><div class="placeholder-text"><i class="fas fa-file"></i><p>Nenhum texto para exibir. Faça uma análise primeiro.</p></div></div></div></div>
                     </div>
 
-                    <!-- RECOMENDAÇÕES -->
-                    <div class="recommendations">
-                        <h3><i class="fas fa-lightbulb"></i> RECOMENDAÇÕES PARA O PROFESSOR</h3>
-                        <div class="recommendations-list" id="recommendationsList">
-                            <div class="recommendation-item">
-                                <i class="fas fa-info-circle"></i>
-                                <span>Analise o trabalho completo antes de tomar decisões</span>
-                            </div>
-                        </div>
-                    </div>
+                    <div class="recommendations"><h3><i class="fas fa-lightbulb"></i> RECOMENDAÇÕES PARA O PROFESSOR</h3><div class="recommendations-list" id="recommendationsList"><div class="recommendation-item"><i class="fas fa-info-circle"></i><span>Analise o trabalho completo antes de tomar decisões</span></div></div></div>
 
-                    <!-- RELATÓRIO -->
                     <div class="report-actions">
-                        <button class="btn btn-report" id="generateReportBtn">
-                            <i class="fas fa-file-pdf"></i> GERAR RELATÓRIO DETALHADO (PDF)
-                        </button>
-                        <button class="btn btn-export" id="exportDataBtn">
-                            <i class="fas fa-download"></i> EXPORTAR DADOS DA ANÁLISE
-                        </button>
-                        <button class="btn btn-history" id="saveAnalysisBtn">
-                            <i class="fas fa-save"></i> SALVAR PARA HISTÓRICO
-                        </button>
+                        <button class="btn btn-report" id="generateReportBtn"><i class="fas fa-file-pdf"></i> GERAR RELATÓRIO DETALHADO (PDF)</button>
+                        <button class="btn btn-export" id="exportDataBtn"><i class="fas fa-download"></i> EXPORTAR DADOS DA ANÁLISE</button>
+                        <button class="btn btn-history" id="saveAnalysisBtn"><i class="fas fa-save"></i> SALVAR PARA HISTÓRICO</button>
                     </div>
                 </div>
             </div>
         </div>
 
-        <footer>
-            <div class="footer-content">
-                <div class="footer-logo">
-                    <i class="fas fa-graduation-cap"></i>
-                    <span>DETECTOR ACADÊMICO DE IA</span>
-                </div>
-                <div class="footer-info">
-                    <p>Ferramenta desenvolvida para auxiliar professores na detecção de uso de IA em trabalhos acadêmicos</p>
-                    <p class="footer-warning"><i class="fas fa-exclamation-triangle"></i> Esta ferramenta é um auxiliar. Decisões finais devem considerar contexto completo.</p>
-                </div>
-                <div class="footer-version">
-                    Versão 2.0 | Especializada para uso educacional
-                </div>
-            </div>
-        </footer>
+        <footer><div class="footer-content"><div class="footer-logo"><i class="fas fa-graduation-cap"></i><span>DETECTOR ACADÊMICO DE IA</span></div><div class="footer-info"><p>Ferramenta desenvolvida para auxiliar professores na detecção de uso de IA em trabalhos acadêmicos</p><p class="footer-warning"><i class="fas fa-exclamation-triangle"></i> Esta ferramenta é um auxiliar. Decisões finais devem considerar contexto completo.</p></div><div class="footer-version">Versão 2.0 | Especializada para uso educacional</div></div></footer>
     </div>
 
-    <!-- MODAL DE AJUDA -->
-    <div class="modal" id="helpModal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3><i class="fas fa-question-circle"></i> AJUDA - DETECTOR ACADÊMICO</h3>
-                <button class="modal-close" id="closeHelpModal">&times;</button>
-            </div>
-            <div class="modal-body">
-                <div class="help-section">
-                    <h4>Como usar esta ferramenta</h4>
-                    <p>Esta ferramenta especializada analisa trabalhos acadêmicos em busca de padrões característicos de textos gerados por IA.</p>
-                </div>
-                <div class="help-section">
-                    <h4>Interpretando os resultados</h4>
-                    <ul>
-                        <li><strong>Probabilidade acima de 70% humano</strong>: Provável autoria estudantil</li>
-                        <li><strong>Probabilidade entre 40-70%</strong>: Características mistas - análise detalhada recomendada</li>
-                        <li><strong>Probabilidade abaixo de 40% humano</strong>: Fortes indícios de uso de IA</li>
-                    </ul>
-                </div>
-                <div class="help-section">
-                    <h4>Alertas acadêmicos importantes</h4>
-                    <p>Os alertas indicam desvios significativos do esperado para o nível acadêmico selecionado.</p>
-                </div>
-            </div>
-        </div>
-    </div>
+    <div class="modal" id="helpModal"><div class="modal-content"><div class="modal-header"><h3><i class="fas fa-question-circle"></i> AJUDA - DETECTOR ACADÊMICO</h3><button class="modal-close" id="closeHelpModal">&times;</button></div><div class="modal-body"><div class="help-section"><h4>Como usar esta ferramenta</h4><p>Esta ferramenta especializada analisa trabalhos acadêmicos em busca de padrões característicos de textos gerados por IA.</p></div><div class="help-section"><h4>Interpretando os resultados</h4><ul><li><strong>Probabilidade acima de 70% humano</strong>: Provável autoria estudantil</li><li><strong>Probabilidade entre 40-70%</strong>: Características mistas - análise detalhada recomendada</li><li><strong>Probabilidade abaixo de 40% humano</strong>: Fortes indícios de uso de IA</li></ul></div><div class="help-section"><h4>Alertas acadêmicos importantes</h4><p>Os alertas indicam desvios significativos do esperado para o nível acadêmico selecionado.</p></div></div></div></div>
 
-    <!-- SCRIPT PRINCIPAL (type="module" para importar Transformers.js) -->
     <script type="module" src="script.js"></script>
 </body>
 </html>
